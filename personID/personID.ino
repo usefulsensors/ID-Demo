@@ -11,6 +11,7 @@
 /*--- INPUT CONSTANTS ---*/
 #define BAUD_RATE 9600
 #define SPI_CLK_RATE 16000000
+#define LED_WRITE_RATE 250
 
 /*--- PIN DEFINITIONS ---*/
 #define sclk 13
@@ -21,6 +22,14 @@
 #define LED_SDI_PIN 17
 #define LED_CLK_PIN 21
 #define LED_LE_PIN 20
+#define B0_PIN 7
+#define B1_PIN 5
+#define B2_PIN 4
+#define B3_PIN 3
+#define B4_PIN 2
+#define B5_PIN 14
+#define B6_PIN 15
+#define B7_PIN 16
 
 /*--- COLOR DEFINITIONS ---*/
 #define BLACK           0x0000
@@ -34,6 +43,7 @@
 
 /*--- OTHER CONSTANTS ---*/
 #define ID_N 8
+#define NO_ID -1
 
 /*--- TEST VARIABLES ---*/
 
@@ -42,14 +52,31 @@ static void initMessage(void);
 static void displayID(int,int,int,int,int,int);
 static void displayCalibration(int,int,int,int,int,int);
 static void displayIDLED(int);
+static void initScreen();
+static void b0ISR();
+static void b1ISR();
+static void b2ISR();
+static void b3ISR();
+static void b4ISR();
+static void b5ISR();
+static void b6ISR();
+static void b7ISR();
 
 /*--- CLASS INSTANCES ---*/
 Adafruit_SSD1331 display = Adafruit_SSD1331(&SPI, cs, dc, rst);
-LEDDriver ledDriver = LEDDriver(LED_SDI_PIN,LED_CLK_PIN,LED_LE_PIN,250);
+LEDDriver ledDriver = LEDDriver(LED_SDI_PIN,LED_CLK_PIN,LED_LE_PIN,LED_WRITE_RATE);
 buzzDriver buzzer = buzzDriver();
 
 /*--- MODULE VARIABLES ---*/
 static int ledBits[LED_N] = {1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0};
+volatile int8_t calID = NO_ID;
+
+/*--- STATE MACHINES ---*/
+typedef enum{
+  STANDBY, WAIT, ID_CAL, TRACK_FACE
+}DemoStates_t;
+
+DemoStates_t DemoState;
 
 void setup() {
   pinMode(LED_SDI_PIN,OUTPUT);
@@ -59,22 +86,48 @@ void setup() {
   display.begin(SPI_CLK_RATE);
   initMessage();
   delay(500);
-//  for(int i = 0; i < 10; i++){
-//    displayID(10+i,10+i,15,15,5,random(100));
-//    delay(200);
-//  }
-//  for(int i = 0; i < 10; i++){
-//    displayCalibration(display.width()/2-8 + random(-5,5),display.height()/2-8 + random(-5,5),15+random(0,5),15+random(0,5),5,(i+1)*10);
-//    delay(200);
-//  }
-  ledDriver.setOutputs(ledBits);
-  buzzer.buzz(1000,150);
-  //displayIDLED(0);
+  initScreen();
+  DemoState = STANDBY;
+  attachInterrupt(digitalPinToInterrupt(B0_PIN), b0ISR, FALLING);
+  attachInterrupt(digitalPinToInterrupt(B1_PIN), b1ISR, FALLING);
+  attachInterrupt(digitalPinToInterrupt(B2_PIN), b2ISR, FALLING);
+  attachInterrupt(digitalPinToInterrupt(B3_PIN), b3ISR, FALLING);
+  attachInterrupt(digitalPinToInterrupt(B4_PIN), b4ISR, FALLING);
+  attachInterrupt(digitalPinToInterrupt(B5_PIN), b5ISR, FALLING);
+  attachInterrupt(digitalPinToInterrupt(B6_PIN), b6ISR, FALLING);
+  attachInterrupt(digitalPinToInterrupt(B7_PIN), b7ISR, FALLING);
 }
 
 void loop() {
   ledDriver.ledDriverTick();
   buzzer.buzzDriverTick();
+
+  switch(DemoState){
+    case STANDBY:{
+      if(calID != NO_ID){
+        displayIDLED(calID);
+        buzzer.buzz(250,255);
+        DemoState = ID_CAL;
+      }
+    }
+    break;
+
+    case WAIT:{
+      
+    }
+    break;
+
+    case ID_CAL:{
+      calID = NO_ID;
+      DemoState = STANDBY;
+    }
+    break;
+
+    case TRACK_FACE:{
+      
+    }
+    break;
+  }
 }
 
 /*--- FUNCTION DEFINITIONS ---*/
@@ -98,14 +151,24 @@ static void initMessage(void){
 
 static void displayID(int x, int y, int w, int h, int ID, int confidence){
   display.fillScreen(BLACK);
-  if(confidence > 99) confidence = 99;
   display.setTextSize(1);
   display.setTextColor(YELLOW);
+  if(confidence > 99) confidence = 99;
   display.drawRect(x,y,w,h,CYAN);
   display.setCursor(0, display.height()-10);
   display.println("ID:" + String(ID));
   display.setCursor(display.width()-20, display.height()-10);
   display.println(String(confidence) + "%");
+}
+
+static void initScreen(){
+  display.fillScreen(BLACK);
+  display.setTextSize(1);
+  display.setTextColor(YELLOW);
+  display.setCursor(0, display.height()-10);
+  display.println("ID:" + String(NO_ID));
+  display.setCursor(display.width()-20, display.height()-10);
+  display.println(String(99) + "%");
 }
 
 static void displayCalibration(int x, int y, int w, int h, int ID, int calIndex){
@@ -132,4 +195,36 @@ static void displayIDLED(int ID){
   }
   if(ID != -1) ledBits[mapID[ID]] = 1;
   ledDriver.setOutputs(ledBits);
+}
+
+static void b0ISR(){
+  calID = 0;
+}
+
+static void b1ISR(){
+  calID = 1;
+}
+
+static void b2ISR(){
+  calID = 2;
+}
+
+static void b3ISR(){
+  calID = 3;
+}
+
+static void b4ISR(){
+  calID = 4;
+}
+
+static void b5ISR(){
+  calID = 5;
+}
+
+static void b6ISR(){
+  calID = 6;
+}
+
+static void b7ISR(){
+  calID = 7;
 }
