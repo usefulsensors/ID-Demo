@@ -1,12 +1,12 @@
 /*--- NOTES ---
 */
 
-
 /*--- INCLUDE LIBRARIES ---*/
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1331.h>
 #include <SPI.h>
 #include "LEDDriver.h"
+#include "buzzDriver.h"
 
 /*--- INPUT CONSTANTS ---*/
 #define BAUD_RATE 9600
@@ -35,6 +35,8 @@
 /*--- OTHER CONSTANTS ---*/
 #define ID_N 8
 
+/*--- TEST VARIABLES ---*/
+
 /*--- FUNCTION PROTOTYES ---*/
 static void initMessage(void);
 static void displayID(int,int,int,int,int,int);
@@ -43,8 +45,8 @@ static void displayIDLED(int);
 
 /*--- CLASS INSTANCES ---*/
 Adafruit_SSD1331 display = Adafruit_SSD1331(&SPI, cs, dc, rst);
-LEDDriver ledDriver = LEDDriver(LED_SDI_PIN,LED_CLK_PIN,LED_LE_PIN,1);
-
+LEDDriver ledDriver = LEDDriver(LED_SDI_PIN,LED_CLK_PIN,LED_LE_PIN,250);
+buzzDriver buzzer = buzzDriver();
 
 /*--- MODULE VARIABLES ---*/
 static int ledBits[LED_N] = {1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0};
@@ -57,20 +59,22 @@ void setup() {
   display.begin(SPI_CLK_RATE);
   initMessage();
   delay(500);
-  for(int i = 0; i < 10; i++){
-    displayID(10+i,10+i,15,15,5,random(100));
-    delay(200);
-  }
-  for(int i = 0; i < 10; i++){
-    displayCalibration(display.width()/2-8 + random(-5,5),display.height()/2-8 + random(-5,5),15+random(0,5),15+random(0,5),5,(i+1)*10);
-    delay(200);
-  }
+//  for(int i = 0; i < 10; i++){
+//    displayID(10+i,10+i,15,15,5,random(100));
+//    delay(200);
+//  }
+//  for(int i = 0; i < 10; i++){
+//    displayCalibration(display.width()/2-8 + random(-5,5),display.height()/2-8 + random(-5,5),15+random(0,5),15+random(0,5),5,(i+1)*10);
+//    delay(200);
+//  }
   ledDriver.setOutputs(ledBits);
-  displayIDLED(0);
+  buzzer.buzz(1000,150);
+  //displayIDLED(0);
 }
 
 void loop() {
-  ledDriver.driverTick();
+  ledDriver.ledDriverTick();
+  buzzer.buzzDriverTick();
 }
 
 /*--- FUNCTION DEFINITIONS ---*/

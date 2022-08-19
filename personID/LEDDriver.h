@@ -15,7 +15,7 @@ typedef enum{
 public:
 	LEDDriver();
 	LEDDriver(int SDI, int CLK, int LE, int microsPeriod);
-  void driverTick();
+  void ledDriverTick();
   void setOutputs(int *inputArray);
   
 private:

@@ -23,7 +23,7 @@ LEDDriver::LEDDriver(int SDI, int CLK, int LE, int delayLen){
   this->LEDWriteState = LED_WRITE_STANDBY;
 }
 
-void LEDDriver::driverTick(){
+void LEDDriver::ledDriverTick(){
   switch(DriverState){
     case DRIVER_STANDBY:{
       
