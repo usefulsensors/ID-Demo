@@ -85,7 +85,7 @@ void LEDDriver::ledDriverTick(){
 
 void LEDDriver::setOutputs(int *inputArray){
   for(int i = 0; i < LED_N; i++){
-    this->outputs[i] = inputArray[LED_N-1-i]; //Flip order so LSB of inputArray is loaded first
+    this->outputs[i] = inputArray[i];
   }
   this->DriverState = DRIVER_WRITETOREGISTERS;
 }

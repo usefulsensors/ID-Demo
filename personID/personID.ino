@@ -11,7 +11,7 @@
 /*--- INPUT CONSTANTS ---*/
 #define BAUD_RATE 9600
 #define SPI_CLK_RATE 16000000
-#define LED_WRITE_RATE 250
+#define LED_WRITE_RATE 1
 
 /*--- PIN DEFINITIONS ---*/
 #define sclk 13
@@ -44,6 +44,7 @@
 /*--- OTHER CONSTANTS ---*/
 #define ID_N 8
 #define NO_ID -1
+#define DEBOUNCE_DELAY 250
 
 /*--- TEST VARIABLES ---*/
 
@@ -70,6 +71,7 @@ buzzDriver buzzer = buzzDriver();
 /*--- MODULE VARIABLES ---*/
 static int ledBits[LED_N] = {1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0};
 volatile int8_t calID = NO_ID;
+static long timestamp;
 
 /*--- STATE MACHINES ---*/
 typedef enum{
@@ -106,8 +108,9 @@ void loop() {
     case STANDBY:{
       if(calID != NO_ID){
         displayIDLED(calID);
-        buzzer.buzz(250,255);
+        buzzer.buzz(100,200);
         DemoState = ID_CAL;
+        timestamp = millis();
       }
     }
     break;
@@ -119,7 +122,7 @@ void loop() {
 
     case ID_CAL:{
       calID = NO_ID;
-      DemoState = STANDBY;
+      if(millis()-timestamp > DEBOUNCE_DELAY) DemoState = STANDBY;
     }
     break;
 
@@ -166,9 +169,9 @@ static void initScreen(){
   display.setTextSize(1);
   display.setTextColor(YELLOW);
   display.setCursor(0, display.height()-10);
-  display.println("ID:" + String(NO_ID));
+  display.println("ID:--");
   display.setCursor(display.width()-20, display.height()-10);
-  display.println(String(99) + "%");
+  display.println("--%");
 }
 
 static void displayCalibration(int x, int y, int w, int h, int ID, int calIndex){
@@ -189,7 +192,7 @@ static void displayCalibration(int x, int y, int w, int h, int ID, int calIndex)
 }
 
 static void displayIDLED(int ID){
-  const int mapID[ID_N] = {0,1,2,3,12,13,14,15};
+  const int mapID[ID_N] = {3,2,1,0,12,13,14,15};
   for(int i=0; i<LED_N; i++){
     ledBits[i] = 0;
   }
