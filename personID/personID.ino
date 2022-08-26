@@ -11,7 +11,7 @@
 /*--- INPUT CONSTANTS ---*/
 #define BAUD_RATE 9600
 #define SPI_CLK_RATE 16000000
-#define LED_WRITE_RATE 250
+#define LED_WRITE_RATE 1
 
 /*--- PIN DEFINITIONS ---*/
 #define sclk 13
