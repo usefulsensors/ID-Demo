@@ -2,6 +2,7 @@
 #define I2CDriver_h
 
 typedef struct {
+  float confidence;
   uint8_t bounding_box[4];
   int8_t identity;
 } inference_results_t;
