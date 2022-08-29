@@ -8,11 +8,11 @@ typedef struct {
 } inference_results_t;
 
 class I2CDriver{
-typedef enum{
-  MODE_STANDBY, MODE_CONTINUOUS
-} DeviceMode_t;
-
 public:  
+  typedef enum{
+    MODE_STANDBY, MODE_CONTINUOUS
+  } DeviceMode_t;
+
   I2CDriver();
   void setMode(DeviceMode_t mode);
   void singleCapture();
