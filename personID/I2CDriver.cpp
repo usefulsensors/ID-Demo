@@ -37,10 +37,10 @@ inference_results_t I2CDriver::read() {
   if (Wire.available() != sizeof(inference_results_t)) {
     return results;
   }
-  float confidence;
+  volatile float confidence;
   int8_t* confidence_bytes = (int8_t*)(&confidence);
   for (int i=0; i<sizeof(float); i++) {
-    confidence_bytes[sizeof(float) - i - 1] = Wire.read();
+    confidence_bytes[i] = Wire.read();
   }
   results.confidence = confidence;
   results.bounding_box[0] = Wire.read();
