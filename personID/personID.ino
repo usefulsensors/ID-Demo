@@ -50,6 +50,7 @@
 #define ID_N 8
 #define NO_ID -1
 #define DEBOUNCE_DELAY 500
+#define REFRESH_PERIOD 100
 
 /*--- TEST VARIABLES ---*/
 
@@ -79,15 +80,20 @@ I2CDriver i2c = I2CDriver();
 static int ledBits[LED_N] = {1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0};
 volatile int8_t calID = NO_ID;
 volatile int8_t dataFlag = 0;
-static long timestamp;
+static long demoTimestamp;
 static inference_results_t results;
 
 /*--- STATE MACHINES ---*/
 typedef enum{
-  STANDBY, ID_CAL
+  DEMO_CONTINUOUS, ID_CAL
 }DemoStates_t;
 
+typedef enum{
+  DISPLAY_STANDBY, UPDATE_DISPLAY
+}DisplayStates_t;
+
 DemoStates_t DemoState;
+DisplayStates_t DisplayState;
 
 void setup() {
   pinMode(LED_SDI_PIN,OUTPUT);
@@ -99,7 +105,8 @@ void setup() {
   initMessage();
   delay(500);
   initScreen();
-  DemoState = STANDBY;
+  DemoState = DEMO_CONTINUOUS;
+  DisplayState = DISPLAY_STANDBY;
   attachInterrupt(digitalPinToInterrupt(IO_PIN), ioISR, RISING);
   attachInterrupt(digitalPinToInterrupt(B0_PIN), b0ISR, FALLING);
   attachInterrupt(digitalPinToInterrupt(B1_PIN), b1ISR, FALLING);
@@ -118,22 +125,46 @@ void loop() {
   if(dataFlag){
     dataFlag = 0;
     results = i2c.read();
+    DisplayState = UPDATE_DISPLAY;
   }
 
   switch(DemoState){
-    case STANDBY:{
+    case DEMO_CONTINUOUS:{
       if(calID != NO_ID){
         displayIDLED(calID);
         calID = NO_ID;
         buzzer.buzz(100,200);
         DemoState = ID_CAL;
-        timestamp = millis();
+        demoTimestamp = millis();
       }
     }
     break;
 
     case ID_CAL:{
-      if(millis()-timestamp > DEBOUNCE_DELAY) DemoState = STANDBY;
+      if(millis() - demoTimestamp > DEBOUNCE_DELAY) DemoState = DEMO_CONTINUOUS;
+    }
+    break;
+  }
+
+  switch(DisplayState){
+    case DISPLAY_STANDBY:{
+      
+    }
+    break;
+
+    case UPDATE_DISPLAY:{
+      int confidence = results.confidence * 100;
+      int x1 = results.bounding_box[0];
+      int y1 = results.bounding_box[1];
+      int x2 = results.bounding_box[2];
+      int y2 = results.bounding_box[3];
+      int ID = results.identity;
+      if(DemoState == DEMO_CONTINUOUS){
+        displayID(x1, y1, x2, y2, ID, confidence);
+      }else if(DemoState == ID_CAL){
+        
+      }
+      DisplayState = DISPLAY_STANDBY;
     }
     break;
   }
@@ -158,12 +189,14 @@ static void initMessage(void){
   }
 }
 
-static void displayID(int x, int y, int w, int h, int ID, int confidence){
+static void displayID(int x1, int y1, int x2, int y2, int ID, int confidence){
+  int w = x2 - x1;
+  int h = y2 - y1;
   display.fillScreen(BLACK);
   display.setTextSize(1);
   display.setTextColor(YELLOW);
   if(confidence > 99) confidence = 99;
-  display.drawRect(x,y,w,h,CYAN);
+  display.drawRect(x1,y1,w,h,CYAN);
   display.setCursor(0, display.height()-10);
   display.println("ID:" + String(ID));
   display.setCursor(display.width()-20, display.height()-10);
@@ -180,17 +213,17 @@ static void initScreen(){
   display.println("--%");
 }
 
-static void displayCalibration(int x, int y, int w, int h, int ID, int calIndex){
+static void displayCalibration(int x1, int y1, int x2, int y2, int ID, int calIndex){
+  int w = x2 - x1;
+  int h = y2 - y1;
   display.fillScreen(BLACK);
-  
   const int BAR_W = 50;
   const int BAR_H = 8;
   const int MAX_INDEX = 100;
   int progWidth = float(calIndex)/float(MAX_INDEX)*float(BAR_W);
-  
   display.setTextColor(YELLOW);
   display.setTextSize(1);
-  display.drawRect(x,y,w,h,CYAN);
+  display.drawRect(x1,y1,w,h,CYAN);
   display.setCursor(0, display.height()-10);
   display.println("ID:" + String(ID));
   display.drawRect(display.width()-BAR_W,display.height()-10,BAR_W,BAR_H,YELLOW);
