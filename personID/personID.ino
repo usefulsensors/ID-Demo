@@ -5,8 +5,11 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1331.h>
 #include <SPI.h>
+#include <Wire.h>
+#include <string.h>
 #include "LEDDriver.h"
 #include "buzzDriver.h"
+#include "I2CDriver.h"
 
 /*--- INPUT CONSTANTS ---*/
 #define BAUD_RATE 9600
@@ -22,6 +25,8 @@
 #define LED_SDI_PIN 17
 #define LED_CLK_PIN 21
 #define LED_LE_PIN 20
+
+#define IO_PIN 12
 #define B0_PIN 7
 #define B1_PIN 5
 #define B2_PIN 4
@@ -44,7 +49,7 @@
 /*--- OTHER CONSTANTS ---*/
 #define ID_N 8
 #define NO_ID -1
-#define DEBOUNCE_DELAY 250
+#define DEBOUNCE_DELAY 500
 
 /*--- TEST VARIABLES ---*/
 
@@ -54,6 +59,7 @@ static void displayID(int,int,int,int,int,int);
 static void displayCalibration(int,int,int,int,int,int);
 static void displayIDLED(int);
 static void initScreen();
+static void ioISR();
 static void b0ISR();
 static void b1ISR();
 static void b2ISR();
@@ -67,15 +73,18 @@ static void b7ISR();
 Adafruit_SSD1331 display = Adafruit_SSD1331(&SPI, cs, dc, rst);
 LEDDriver ledDriver = LEDDriver(LED_SDI_PIN,LED_CLK_PIN,LED_LE_PIN,LED_WRITE_RATE);
 buzzDriver buzzer = buzzDriver();
+I2CDriver i2c = I2CDriver();
 
 /*--- MODULE VARIABLES ---*/
 static int ledBits[LED_N] = {1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0};
 volatile int8_t calID = NO_ID;
+volatile int8_t dataFlag = 0;
 static long timestamp;
+static inference_results_t results;
 
 /*--- STATE MACHINES ---*/
 typedef enum{
-  STANDBY, WAIT, ID_CAL, TRACK_FACE
+  STANDBY, ID_CAL
 }DemoStates_t;
 
 DemoStates_t DemoState;
@@ -85,11 +94,13 @@ void setup() {
   pinMode(LED_CLK_PIN,OUTPUT);
   pinMode(LED_LE_PIN,OUTPUT);
   Serial.begin(BAUD_RATE);
+  i2c.setMode(i2c.MODE_CONTINUOUS);
   display.begin(SPI_CLK_RATE);
   initMessage();
   delay(500);
   initScreen();
   DemoState = STANDBY;
+  attachInterrupt(digitalPinToInterrupt(IO_PIN), ioISR, RISING);
   attachInterrupt(digitalPinToInterrupt(B0_PIN), b0ISR, FALLING);
   attachInterrupt(digitalPinToInterrupt(B1_PIN), b1ISR, FALLING);
   attachInterrupt(digitalPinToInterrupt(B2_PIN), b2ISR, FALLING);
@@ -104,10 +115,16 @@ void loop() {
   ledDriver.ledDriverTick();
   buzzer.buzzDriverTick();
 
+  if(dataFlag){
+    dataFlag = 0;
+    results = i2c.read();
+  }
+
   switch(DemoState){
     case STANDBY:{
       if(calID != NO_ID){
         displayIDLED(calID);
+        calID = NO_ID;
         buzzer.buzz(100,200);
         DemoState = ID_CAL;
         timestamp = millis();
@@ -115,19 +132,8 @@ void loop() {
     }
     break;
 
-    case WAIT:{
-      
-    }
-    break;
-
     case ID_CAL:{
-      calID = NO_ID;
       if(millis()-timestamp > DEBOUNCE_DELAY) DemoState = STANDBY;
-    }
-    break;
-
-    case TRACK_FACE:{
-      
     }
     break;
   }
@@ -198,6 +204,10 @@ static void displayIDLED(int ID){
   }
   if(ID != -1) ledBits[mapID[ID]] = 1;
   ledDriver.setOutputs(ledBits);
+}
+
+static void ioISR(){
+  dataFlag = 1;
 }
 
 static void b0ISR(){
