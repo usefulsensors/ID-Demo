@@ -3,6 +3,7 @@
 
 typedef struct {
   float confidence;
+  float id_confidence;
   uint8_t bounding_box[4];
   int8_t identity;
 } inference_results_t;
@@ -15,6 +16,7 @@ public:
 
   I2CDriver();
   void setMode(DeviceMode_t mode);
+  void setIdModelEnabled(bool enabled);
   void singleCapture();
   void calibrate(byte id);
   inference_results_t read();

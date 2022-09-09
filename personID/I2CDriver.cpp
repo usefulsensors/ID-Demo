@@ -3,8 +3,9 @@
 
 static const byte kSlaveAddress = 0x62;
 static const byte kModeRegister = 0x01;
-static const byte kSingleCaptureRegister = 0x02;
-static const byte kCalibrationRegister = 0x03;
+static const byte kRunIdModelRegister = 0x02;
+static const byte kSingleCaptureRegister = 0x03;
+static const byte kCalibrationRegister = 0x04;
 
 I2CDriver::I2CDriver() {
   Wire.begin();
@@ -12,6 +13,10 @@ I2CDriver::I2CDriver() {
 }
 void I2CDriver::setMode(DeviceMode_t mode) {
   write(kModeRegister, mode);
+}
+
+void I2CDriver::setIdModelEnabled(bool enabled) {
+  write(kRunIdModelRegister, (byte)enabled);
 }
 
 void I2CDriver::singleCapture() {
@@ -43,10 +48,15 @@ inference_results_t I2CDriver::read() {
     confidence_bytes[i] = Wire.read();
   }
   results.confidence = confidence;
+  for (int i=0; i<sizeof(float); i++) {
+    confidence_bytes[i] = Wire.read();
+  }
+  results.id_confidence = confidence;
   results.bounding_box[0] = Wire.read();
   results.bounding_box[1] = Wire.read();
   results.bounding_box[2] = Wire.read();
   results.bounding_box[3] = Wire.read();
   results.identity = Wire.read();
+
   return results;
 }

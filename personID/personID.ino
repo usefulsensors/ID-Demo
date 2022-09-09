@@ -49,14 +49,14 @@
 /*--- OTHER CONSTANTS ---*/
 #define ID_N 8
 #define NO_ID -1
-#define DEBOUNCE_DELAY 500
+#define DEBOUNCE_DELAY 50
 #define REFRESH_PERIOD 100
 
 /*--- TEST VARIABLES ---*/
 
 /*--- FUNCTION PROTOTYES ---*/
 static void initMessage(void);
-static void displayID(int,int,int,int,int,int);
+static void displayID(int,int,int,int,int,int,int);
 static void displayCalibration(int,int,int,int,int,int);
 static void displayIDLED(int);
 static void initScreen();
@@ -101,6 +101,7 @@ void setup() {
   pinMode(LED_LE_PIN,OUTPUT);
   Serial.begin(BAUD_RATE);
   i2c.setMode(i2c.MODE_CONTINUOUS);
+  i2c.setIdModelEnabled(true);
   display.begin(SPI_CLK_RATE);
   initMessage();
   delay(500);
@@ -118,21 +119,28 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(B7_PIN), b7ISR, FALLING);
 }
 
+int getButtonState() {
+  int button_state = digitalRead(B0_PIN) |
+                    (digitalRead(B1_PIN) << 1) |
+                    (digitalRead(B2_PIN) << 2) |
+                    (digitalRead(B3_PIN) << 3) |
+                    (digitalRead(B4_PIN) << 4) |
+                    (digitalRead(B5_PIN) << 5) |
+                    (digitalRead(B6_PIN) << 6) |
+                    (digitalRead(B7_PIN) << 7);
+  return button_state;
+}
+
 void loop() {
-  ledDriver.ledDriverTick();
   buzzer.buzzDriverTick();
 
-  if(dataFlag){
-    dataFlag = 0;
-    results = i2c.read();
-    DisplayState = UPDATE_DISPLAY;
-  }
+  results = i2c.read();
+  DisplayState = UPDATE_DISPLAY;
 
   switch(DemoState){
     case DEMO_CONTINUOUS:{
       if(calID != NO_ID){
-        displayIDLED(calID);
-        calID = NO_ID;
+        //displayIDLED(calID);
         buzzer.buzz(100,200);
         DemoState = ID_CAL;
         demoTimestamp = millis();
@@ -141,7 +149,14 @@ void loop() {
     break;
 
     case ID_CAL:{
-      if(millis() - demoTimestamp > DEBOUNCE_DELAY) DemoState = DEMO_CONTINUOUS;
+      if(millis() - demoTimestamp > DEBOUNCE_DELAY) {
+        DemoState = DEMO_CONTINUOUS;
+        i2c.calibrate(calID);
+        // Only update to NO_ID if button is not still pressed.
+        if ((getButtonState() >> calID) & 0x1) {
+          calID = NO_ID;
+        }
+      }
     }
     break;
   }
@@ -159,8 +174,9 @@ void loop() {
       int x2 = results.bounding_box[2];
       int y2 = results.bounding_box[3];
       int ID = results.identity;
+      int id_confidence = results.id_confidence * 100;
       if(DemoState == DEMO_CONTINUOUS){
-        displayID(x1, y1, x2, y2, ID, confidence);
+        displayID(x1, y1, x2, y2, ID, confidence, id_confidence);
       }else if(DemoState == ID_CAL){
         
       }
@@ -189,18 +205,27 @@ static void initMessage(void){
   }
 }
 
-static void displayID(int x1, int y1, int x2, int y2, int ID, int confidence){
+static void displayID(int x1, int y1, int x2, int y2, int ID, int confidence, int id_confidence){
+  x1 = (x1 * display.width()) / 100;
+  x2 = (x2 * display.width()) / 100;
+  y1 = (y1 * display.height()) / 100;
+  y2 = (y2 * display.height()) / 100;
   int w = x2 - x1;
   int h = y2 - y1;
   display.fillScreen(BLACK);
   display.setTextSize(1);
   display.setTextColor(YELLOW);
   if(confidence > 99) confidence = 99;
-  display.drawRect(x1,y1,w,h,CYAN);
+  if (confidence > 42) {
+    display.drawRect(x1,y1,w,h,CYAN);
+  }
   display.setCursor(0, display.height()-10);
   display.println("ID:" + String(ID));
-  display.setCursor(display.width()-20, display.height()-10);
+  display.setCursor(display.width() - 20, display.height() - 10);
+  display.println(String(id_confidence) + "%");
+  display.setCursor(0, 10);
   display.println(String(confidence) + "%");
+  displayIDLED(ID);
 }
 
 static void initScreen(){
