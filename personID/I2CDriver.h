@@ -17,6 +17,7 @@ public:
   I2CDriver();
   void setMode(DeviceMode_t mode);
   void setIdModelEnabled(bool enabled);
+  void setSmoothingEnabled(bool enabled);
   void singleCapture();
   void calibrate(byte id);
   inference_results_t read();

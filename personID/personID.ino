@@ -102,6 +102,7 @@ void setup() {
   Serial.begin(BAUD_RATE);
   i2c.setMode(i2c.MODE_CONTINUOUS);
   i2c.setIdModelEnabled(true);
+  i2c.setSmoothingEnabled(true);
   display.begin(SPI_CLK_RATE);
   initMessage();
   delay(500);
@@ -206,10 +207,21 @@ static void initMessage(void){
 }
 
 static void displayID(int x1, int y1, int x2, int y2, int ID, int confidence, int id_confidence){
+  static int old_x1 = 0;
+  static int old_y1 = 0;
+  static int old_x2 = 0;
+  static int old_y2 = 0;
   x1 = (x1 * display.width()) / 100;
   x2 = (x2 * display.width()) / 100;
   y1 = (y1 * display.height()) / 100;
   y2 = (y2 * display.height()) / 100;
+  if (x1 == old_x1 && x2 == old_x2 && y1 == old_y1 && y2 == old_y2) {
+    return;
+  }
+  old_x1 = x1;
+  old_y1 = y1;
+  old_x2 = x2;
+  old_y2 = y2;
   int w = x2 - x1;
   int h = y2 - y1;
   display.fillScreen(BLACK);
@@ -218,6 +230,9 @@ static void displayID(int x1, int y1, int x2, int y2, int ID, int confidence, in
   if(confidence > 99) confidence = 99;
   if (confidence > 42) {
     display.drawRect(x1,y1,w,h,CYAN);
+  }
+  if (id_confidence > 99 || id_confidence < 0) {
+    id_confidence = 0;
   }
   display.setCursor(0, display.height()-10);
   display.println("ID:" + String(ID));

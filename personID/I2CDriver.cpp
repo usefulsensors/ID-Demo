@@ -6,6 +6,7 @@ static const byte kModeRegister = 0x01;
 static const byte kRunIdModelRegister = 0x02;
 static const byte kSingleCaptureRegister = 0x03;
 static const byte kCalibrationRegister = 0x04;
+static const byte kSetSmoothingRegister = 0x05;
 
 I2CDriver::I2CDriver() {
   Wire.begin();
@@ -17,6 +18,10 @@ void I2CDriver::setMode(DeviceMode_t mode) {
 
 void I2CDriver::setIdModelEnabled(bool enabled) {
   write(kRunIdModelRegister, (byte)enabled);
+}
+
+void I2CDriver::setSmoothingEnabled(bool enabled) {
+  write(kSetSmoothingRegister, (byte)enabled);
 }
 
 void I2CDriver::singleCapture() {
