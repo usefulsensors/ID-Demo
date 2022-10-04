@@ -100,9 +100,12 @@ void setup() {
   pinMode(LED_CLK_PIN,OUTPUT);
   pinMode(LED_LE_PIN,OUTPUT);
   Serial.begin(BAUD_RATE);
+  Serial.println("init i2c");
   i2c.setMode(i2c.MODE_CONTINUOUS);
   i2c.setIdModelEnabled(true);
-  i2c.setSmoothingEnabled(true);
+  i2c.setDebugMode(true);
+  i2c.setPersistentIds(false);
+  Serial.println("finish init i2c");
   display.begin(SPI_CLK_RATE);
   initMessage();
   delay(500);
@@ -152,6 +155,7 @@ void loop() {
     case ID_CAL:{
       if(millis() - demoTimestamp > DEBOUNCE_DELAY) {
         DemoState = DEMO_CONTINUOUS;
+        Serial.println("calibrating id " + String(calID));
         i2c.calibrate(calID);
         // Only update to NO_ID if button is not still pressed.
         if ((getButtonState() >> calID) & 0x1) {
@@ -169,15 +173,8 @@ void loop() {
     break;
 
     case UPDATE_DISPLAY:{
-      int confidence = results.confidence * 100;
-      int x1 = results.bounding_box[0];
-      int y1 = results.bounding_box[1];
-      int x2 = results.bounding_box[2];
-      int y2 = results.bounding_box[3];
-      int ID = results.identity;
-      int id_confidence = results.id_confidence * 100;
       if(DemoState == DEMO_CONTINUOUS){
-        displayID(x1, y1, x2, y2, ID, confidence, id_confidence);
+        displayID(results);
       }else if(DemoState == ID_CAL){
         
       }
@@ -190,7 +187,7 @@ void loop() {
 /*--- FUNCTION DEFINITIONS ---*/
 static void initMessage(void){
   display.fillScreen(BLACK);
-  const int FILL_DELAY = 15;
+  const int FILL_DELAY = 10;
   const int BAR_Y = 25;
   const int BAR_H = 8;
   display.setCursor(0, 5);
@@ -206,41 +203,46 @@ static void initMessage(void){
   }
 }
 
-static void displayID(int x1, int y1, int x2, int y2, int ID, int confidence, int id_confidence){
-  static int old_x1 = 0;
-  static int old_y1 = 0;
-  static int old_x2 = 0;
-  static int old_y2 = 0;
-  x1 = (x1 * display.width()) / 100;
-  x2 = (x2 * display.width()) / 100;
-  y1 = (y1 * display.height()) / 100;
-  y2 = (y2 * display.height()) / 100;
-  if (x1 == old_x1 && x2 == old_x2 && y1 == old_y1 && y2 == old_y2) {
+static void displayID(inference_results_t results){
+  static inference_results_t old_results = {};
+  if (!memcmp(&old_results, &results, sizeof(inference_results_t))) {
     return;
   }
-  old_x1 = x1;
-  old_y1 = y1;
-  old_x2 = x2;
-  old_y2 = y2;
-  int w = x2 - x1;
-  int h = y2 - y1;
   display.fillScreen(BLACK);
   display.setTextSize(1);
   display.setTextColor(YELLOW);
-  if(confidence > 99) confidence = 99;
-  if (confidence > 42) {
-    display.drawRect(x1,y1,w,h,CYAN);
+  old_results = results;
+  int id_bitmap = 0;
+  for (int i=0; i< results.num_faces; i++) {
+    int x1 = (results.boxes[i].data[0] * display.width()) / 256;
+    int x2 = (results.boxes[i].data[2] * display.width()) / 256;
+    int y1 = (results.boxes[i].data[1] * display.height()) / 256;
+    int y2 = (results.boxes[i].data[3] * display.height()) / 256;
+  
+    int w = x2 - x1;
+    int h = y2 - y1;
+    uint8_t confidence = results.boxes[i].confidence;
+    if(confidence > 99) confidence = 99;
+    if (confidence > 42) {
+      display.drawRect(x1,y1,w,h,CYAN);
+      display.setCursor(x2 + 1, y1);
+      display.println(String(confidence) + "%");
+    }
+
+    uint8_t id_confidence = results.boxes[i].id_confidence;
+    int8_t id = results.boxes[i].id;
+    if (id >= 0) {
+      display.setCursor(x1, y2+10);
+      display.println(String(results.boxes[i].id) + " (" + String(results.boxes[i].id_confidence) + "%)");
+      id_bitmap |= (1 << results.boxes[i].id);
+    }
+    if (results.boxes[i].face_on) {
+      display.drawRect(x1,y1,w,h,GREEN);
+    }
   }
-  if (id_confidence > 99 || id_confidence < 0) {
-    id_confidence = 0;
-  }
-  display.setCursor(0, display.height()-10);
-  display.println("ID:" + String(ID));
-  display.setCursor(display.width() - 20, display.height() - 10);
-  display.println(String(id_confidence) + "%");
-  display.setCursor(0, 10);
-  display.println(String(confidence) + "%");
-  displayIDLED(ID);
+  display.setCursor(0, 0);
+  display.println("# faces: " + String(results.num_faces));
+  displayIDLED(id_bitmap);
 }
 
 static void initScreen(){
@@ -270,12 +272,14 @@ static void displayCalibration(int x1, int y1, int x2, int y2, int ID, int calIn
   display.fillRect(display.width()-BAR_W,display.height()-10,progWidth,BAR_H,YELLOW);
 }
 
-static void displayIDLED(int ID){
+static void displayIDLED(int ID_bitmap){
   const int mapID[ID_N] = {3,2,1,0,12,13,14,15};
   for(int i=0; i<LED_N; i++){
     ledBits[i] = 0;
   }
-  if(ID != -1) ledBits[mapID[ID]] = 1;
+  for (int i=0; i<ID_N; i++) {
+    ledBits[mapID[i]] = (ID_bitmap >> i) & 0x1;
+  }
   ledDriver.setOutputs(ledBits);
 }
 
